@@ -184,3 +184,5 @@ We can use the VISUALIZE_EXTRACTIONS() function in Streamlit in Snowflake to vis
 Simply add the code in `streamlit.py` to your Streamlit App.  
 
 ## Demo Video
+https://github.com/michaelgorkow/scs_paddleocr/assets/28981844/d3a8a997-7b51-4e98-8752-8e30e95f3aed
+
