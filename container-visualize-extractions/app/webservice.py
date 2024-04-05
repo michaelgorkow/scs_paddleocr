@@ -101,7 +101,7 @@ async def extract_text(request: Request):
         # Download PDF
         doc_bytes = requests.get(doc_download_url).content
         pdfdoc = fitz.open(stream=BytesIO(doc_bytes), filetype="pdf")
-        pix = pdfdoc.get_page_pixmap(doc_page_number-1,matrix=mat)
+        pix = pdfdoc.get_page_pixmap(doc_page_number,matrix=mat)
         img = Image.frombytes('RGB', [pix.width, pix.height], pix.samples)
         img = cv2.cvtColor(np.array(img), cv2.COLOR_BGR2RGB)
 
