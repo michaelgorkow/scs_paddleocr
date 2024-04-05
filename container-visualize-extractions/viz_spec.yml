@@ -1,0 +1,16 @@
+spec:
+  container:
+  - name: container-visualize-extractions
+    image: /ocr_demo/public/image_repository/visualize_extractions:latest
+    env:
+      SNOWFLAKE_DATABASE: OCR_DEMO
+      SNOWFLAKE_SCHEMA: PUBLIC
+      SNOWFLAKE_WAREHOUSE: COMPUTE_WH
+      ZOOM_X: 2
+      ZOOM_Y: 2
+  endpoint:
+  - name: api
+    port: 9000
+  logExporters:
+    eventTableConfig:
+      logLevel: INFO
