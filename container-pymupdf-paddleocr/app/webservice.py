@@ -71,7 +71,7 @@ async def extract_content(request: Request):
       file_extension = file_extension.lower()
       # pdf extraction
       if file_extension == '.pdf':
-         extraction_results = extract_pdf(document_file, relative_path)
+         extraction_results = extract_pdf(document_file)
       total_documents_processed += 1
       return_data.append([index, extraction_results])
    logger.info(f'[TOTAL_DOCUMENTS_PROCESSED: {total_documents_processed}] [DOCUMENT: {relative_path}] [PROCESSING_TIME: {time.time() - start}]')
