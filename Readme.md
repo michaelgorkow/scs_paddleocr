@@ -156,6 +156,17 @@ CREATE OR REPLACE TABLE PAGE_LEVEL_EXTRACTS AS (
 
 -- Generate a base64 image of a specific page of a document
 SELECT VISUALIZE_EXTRACTIONS('LINE_LEVEL_EXTRACTS', '@DOCUMENTS', 'md_hrs_de_folio_bermc_de5344672511.pdf', 0);
+
+-- Example for simplified output (if defined in ocr_spec.yml
+CREATE OR REPLACE TABLE PAGE_LEVEL_EXTRACTS AS (
+    SELECT relative_path,
+           ocr_data.index::INTEGER AS OCR_PAGE_NUMBER,
+           ocr_data.value::TEXT as OCR_TEXT,
+           page_rotations.value::INT AS PAGE_ROTATION
+    FROM RAW_EXTRACTS,
+     LATERAL FLATTEN(input => OCR_RESULTS['OCR_RESULTS']) ocr_data,
+     LATERAL FLATTEN(input => OCR_RESULTS['PAGE_ROTATIONS']) page_rotations
+    HAVING OCR_PAGE_NUMBER = page_rotations.index
 ```
 
 ### 8. Stop Compute Ressources
@@ -179,6 +190,16 @@ FROM TABLE(
  SPLIT_TO_TABLE(SYSTEM$GET_SERVICE_LOGS('SERVICE_VIZ_OCR', 0, 'container-visualize-extractions'), '\n')
   );
 ```
+
+### Asynchronous Execution
+Extracting content from large documents can be time-consuming. To address this, the `PYMUPDF_PADDLEOCR_EXTRACT` service function is designed to run asynchronously. When a batch is first sent to the service, a new job is created and runs in the background. Snowflake will periodically check the job’s status and will return the batch results once processing is complete. Additionally, a simple queuing system is implemented to prevent multiple jobs from running simultaneously, which could otherwise exceed GPU memory limits.
+
+For more information on asynchronous services in Snowflake, please refer to the documentation [here](https://docs.snowflake.com/en/sql-reference/external-functions-implementation#asynchronous-remote-service).
+
+### Simple Output
+For very large documents (thousands of pages for a single document), the extracted content size—and consequently, the response size—may exceed the 10MB limit for service functions. In such cases, you can enable a simplified output that omits bounding box information. To do this, set `SIMPLE_OUTPUT` to `TRUE` in your `ocr_spec.yml` file.
+Please note that enabling SIMPLE_OUTPUT will prevent visualization of extractions in the Streamlit app.
+
 ### Bonus: Streamlit PDF Viewer
 We can use the VISUALIZE_EXTRACTIONS() function in Streamlit in Snowflake to visualize the outputs of our OCR pipeline.  
 Simply add the code in `streamlit.py` to your Streamlit App.  
