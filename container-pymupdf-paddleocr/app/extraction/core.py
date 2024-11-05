@@ -27,14 +27,16 @@ gpu_available  = paddle.device.is_compiled_with_cuda()
 logger.info(f"GPU available: {gpu_available}")
 
 # ENVIRONMENT VARIABLES
-PADDLEOCR_LANGUAGE = os.getenv('PADDLEOCR_LANGUAGE')            # Language for OCR
-MAX_PAGES = int(os.getenv('MAX_PAGES'))                         # Number of pages to extract per document
+PADDLEOCR_LANGUAGE = os.getenv('PADDLEOCR_LANGUAGE')                    # Language for OCR
+MAX_PAGES = int(os.getenv('MAX_PAGES'))                                 # Number of pages to extract per document
 # To get better resolution when turning PDF pages to images for OCR
-ZOOM_X = float(os.getenv('ZOOM_X'))                             # horizontal zoom
-ZOOM_Y = float(os.getenv('ZOOM_Y'))                             # vertical zoom
-mat = fitz.Matrix(ZOOM_X, ZOOM_Y)                               # zoom factor for each dimension
-DET_LIMIT_SIDE_LEN = int(os.getenv('DET_LIMIT_SIDE_LEN'))       # maximum image length (either side) for text detection algorithm, multiples of 32 supported
-DET_DB_UNCLIP_RATIO = float(os.getenv('DET_DB_UNCLIP_RATIO'))   # in/decrease area of crops
+ZOOM_X = float(os.getenv('ZOOM_X'))                                     # horizontal zoom
+ZOOM_Y = float(os.getenv('ZOOM_Y'))                                     # vertical zoom
+mat = fitz.Matrix(ZOOM_X, ZOOM_Y)                                       # zoom factor for each dimension
+DET_LIMIT_SIDE_LEN = int(os.getenv('DET_LIMIT_SIDE_LEN'))               # maximum image length (either side) for text detection algorithm, multiples of 32 supported
+DET_DB_UNCLIP_RATIO = float(os.getenv('DET_DB_UNCLIP_RATIO'))           # in/decrease area of crops
+OUTPUT_FORMAT = os.getenv('OUTPUT_FORMAT')                              # enable simple output (useful for large documents that return >10 MB response hitting the service function limits)
+SIMPLE_OUTPUT_THRESHOLD = float(os.getenv('SIMPLE_OUTPUT_THRESHOLD'))   # Threshold to keep detected words in results
 
 logger.info(f'OCR Language: {PADDLEOCR_LANGUAGE}')
 
@@ -56,8 +58,14 @@ logger.info('Finished loading PaddleOCR model.')
 
 ROTATIONS_TO_TRY = [90,180,270]
 
+# Function to simplify output
+def simplify_output(output):
+    output = " ".join([val[1][0] for val in output if val[1][1] > SIMPLE_OUTPUT_THRESHOLD])
+    return output
+
 # Function to extract content from PDFs
 def extract_pdf(file):
+    total_pages = 0
     start = time.time()
     filestream = io.BytesIO(file)
     ocr_results = []
@@ -98,8 +106,12 @@ def extract_pdf(file):
                                     ocr_results_page = _ocr_results_page
                                     best_rotation = rotation
                         page_rotations.append(best_rotation)
+                        # simple output
+                        if OUTPUT_FORMAT == 'SIMPLE':
+                            ocr_results_page = simplify_output(ocr_results_page)
                         ocr_results.append(ocr_results_page)
-                        logger.info(f'OCR_TIME: {time.time() - ocr_start}')
+                        total_pages += 1
+                        logger.info(f'PAGE: {total_pages}')
                     except Exception as e:
                         logger.error(e)
                 except Exception as e:
