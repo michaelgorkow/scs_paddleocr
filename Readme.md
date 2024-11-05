@@ -197,7 +197,7 @@ Extracting content from large documents can be time-consuming. To address this, 
 For more information on asynchronous services in Snowflake, please refer to the documentation [here](https://docs.snowflake.com/en/sql-reference/external-functions-implementation#asynchronous-remote-service).
 
 ### Simple Output
-For very large documents (thousands of pages for a single document), the extracted content size—and consequently, the response size—may exceed the 10MB limit for service functions. In such cases, you can enable a simplified output that omits bounding box information. To do this, set `SIMPLE_OUTPUT` to `TRUE` in your `ocr_spec.yml` file.
+For very large documents (thousands of pages for a single document), the extracted content size—and consequently, the response size—may exceed the 10MB limit for service functions. In such cases, you can enable a simplified output that omits bounding box information. To do this, set `OUTPUT_FORMAT` to `SIMPLE` in your `ocr_spec.yml` file.
 Please note that enabling SIMPLE_OUTPUT will prevent visualization of extractions in the Streamlit app.
 
 ### Bonus: Streamlit PDF Viewer
