@@ -8,23 +8,13 @@ import json
 from paddleocr import PaddleOCR
 from PIL import Image
 import time
-
-# Logging
-def get_logger(logger_name):
-   logger = logging.getLogger(logger_name)
-   logger.setLevel(logging.DEBUG)
-   handler = logging.StreamHandler(sys.stdout)
-   handler.setLevel(logging.DEBUG)
-   handler.setFormatter(
-      logging.Formatter(
-      '%(name)s [%(asctime)s] [%(levelname)s] %(message)s'))
-   logger.addHandler(handler)
-   return logger
-logger = get_logger('logger-pymupdf-paddleocr-core')
+    
+logger = logging.getLogger('logger-pymupdf-paddleocr-core')
+logger.setLevel(logging.INFO)
 
 import paddle
 gpu_available  = paddle.device.is_compiled_with_cuda()
-logger.info(f"GPU available: {gpu_available}")
+logger.debug(f"GPU available: {gpu_available}")
 
 # ENVIRONMENT VARIABLES
 PADDLEOCR_LANGUAGE = os.getenv('PADDLEOCR_LANGUAGE')                    # Language for OCR
@@ -36,9 +26,11 @@ mat = fitz.Matrix(ZOOM_X, ZOOM_Y)                                       # zoom f
 DET_LIMIT_SIDE_LEN = int(os.getenv('DET_LIMIT_SIDE_LEN'))               # maximum image length (either side) for text detection algorithm, multiples of 32 supported
 DET_DB_UNCLIP_RATIO = float(os.getenv('DET_DB_UNCLIP_RATIO'))           # in/decrease area of crops
 OUTPUT_FORMAT = os.getenv('OUTPUT_FORMAT')                              # enable simple output (useful for large documents that return >10 MB response hitting the service function limits)
-SIMPLE_OUTPUT_THRESHOLD = float(os.getenv('SIMPLE_OUTPUT_THRESHOLD'))   # Threshold to keep detected words in results
+if OUTPUT_FORMAT == 'SIMPLE':
+    SIMPLE_OUTPUT_THRESHOLD = float(os.getenv('SIMPLE_OUTPUT_THRESHOLD'))   # Threshold to keep detected words in results
+    
 
-logger.info(f'OCR Language: {PADDLEOCR_LANGUAGE}')
+logger.debug(f'OCR Language: {PADDLEOCR_LANGUAGE}')
 
 # Load paddleocr
 ocr = PaddleOCR(
@@ -54,7 +46,7 @@ ocr = PaddleOCR(
    save_crop_res=False,
    det_db_unclip_ratio=DET_DB_UNCLIP_RATIO
    )
-logger.info('Finished loading PaddleOCR model.')
+logger.debug('Finished loading PaddleOCR model.')
 
 ROTATIONS_TO_TRY = [90,180,270]
 
@@ -81,37 +73,40 @@ def extract_pdf(file):
                     try:
                         ocr_start = time.time()
                         best_rotation = 0
-                        ocr_results_page = ocr.ocr(np_image)[0] # run ocr
-                        try:
+                        ocr_results_page = ocr.ocr(np_image)
+                        if ocr_results_page[0] is not None:
+                            ocr_results_page = ocr_results_page[0] # run ocr
                             ocr_results_page_avg_conf = np.mean([val[1][1] for val in ocr_results_page])+0.05 # small bonus assuming most pages are not rotated
                             ocr_results_page_num_boxes = len(ocr_results_page)
-                        except:
+                        else:
                             ocr_results_page_avg_conf = 0
                             ocr_results_page_num_boxes = 0
                         if ocr_results_page_avg_conf < 0.9:
                             # try different rotations if low confidence
                             for rotation in ROTATIONS_TO_TRY:
                                 img = np.array(Image.fromarray(np_image).rotate(rotation, expand=True)) # rotate
-                                _ocr_results_page =  ocr.ocr(img)[0] # run ocr
-                                try:
+                                _ocr_results_page =  ocr.ocr(img)
+                                if _ocr_results_page[0] is None:
+                                    continue
+                                else:
+                                    _ocr_results_page = _ocr_results_page[0]
                                     _ocr_results_page_avg_conf = np.mean([val[1][1] for val in _ocr_results_page])
                                     _ocr_results_page_num_boxes = len(_ocr_results_page)
-                                except Exception as e:
-                                    logger.error(e)
-                                    _ocr_results_page_avg_conf = 0
-                                    _ocr_results_page_num_boxes = 0
-                                if _ocr_results_page_avg_conf > ocr_results_page_avg_conf and (_ocr_results_page_num_boxes >= ocr_results_page_num_boxes):
-                                    ocr_results_page_avg_conf = _ocr_results_page_avg_conf
-                                    ocr_results_page_num_boxes = _ocr_results_page_num_boxes
-                                    ocr_results_page = _ocr_results_page
-                                    best_rotation = rotation
+                                    if _ocr_results_page_avg_conf > ocr_results_page_avg_conf and (_ocr_results_page_num_boxes >= ocr_results_page_num_boxes):
+                                        ocr_results_page_avg_conf = _ocr_results_page_avg_conf
+                                        ocr_results_page_num_boxes = _ocr_results_page_num_boxes
+                                        ocr_results_page = _ocr_results_page
+                                        best_rotation = rotation
+                            if _ocr_results_page[0] is None:
+                                # assuming all rotations yielded no results
+                                ocr_results_page = ''
                         page_rotations.append(best_rotation)
                         # simple output
                         if OUTPUT_FORMAT == 'SIMPLE':
                             ocr_results_page = simplify_output(ocr_results_page)
                         ocr_results.append(ocr_results_page)
                         total_pages += 1
-                        logger.info(f'PAGE: {total_pages}')
+                        logger.debug(f'PAGE: {total_pages}')
                     except Exception as e:
                         logger.error(e)
                 except Exception as e:
@@ -121,5 +116,5 @@ def extract_pdf(file):
                 break
     except Exception as e:
         logger.error(e)
-    logger.info(f'EXTRACTPDF_TIME: {time.time() - start}')
+    logger.debug(f'EXTRACTPDF_TIME: {time.time() - start}')
     return {'OCR_RESULTS':ocr_results, 'PAGE_ROTATIONS':page_rotations}
