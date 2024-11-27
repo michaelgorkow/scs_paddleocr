@@ -8,10 +8,10 @@ spec:
         limits:
           nvidia.com/gpu: 1
       env:
-        PADDLEOCR_LANGUAGE: en
+        PADDLEOCR_LANGUAGE: fr
         ZOOM_X: 2
         ZOOM_Y: 2
-        MAX_PAGES: 100
+        MAX_PAGES: 2
         DET_LIMIT_SIDE_LEN: 3200 # multiples of 32 supported
         DETECT_PAGE_ROTATION: TRUE # detects page rotation
         DET_DB_UNCLIP_RATIO: 2.5 # increase cropped area (1.6 is default)
@@ -32,3 +32,8 @@ spec:
   logExporters:
     eventTableConfig:
       logLevel: INFO
+  platformMonitor:
+    metricConfig:
+      groups:
+      - system
+      - system_limits
