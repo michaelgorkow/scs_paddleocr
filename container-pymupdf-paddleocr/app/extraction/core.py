@@ -72,43 +72,57 @@ def extract_pdf(file, relative_path):
     if not doc.page_count:
         logger.error(f'[CURRENT DOCUMENT: {relative_path}] [ERROR_MESSAGE: EMPTY_DOCUMENT]')
         return {'OCR_RESULTS':[], 'PAGE_ROTATIONS':[], 'ERROR_MESSAGE':'EMPTY_DOCUMENT'}
-    for page in doc.pages():
-        if page_no <= MAX_PAGES:
-            pix = page.get_pixmap(matrix=mat)  # render page to an image
-            np_image = np.frombuffer(buffer=pix.samples, dtype=np.uint8).reshape((pix.height, pix.width, 3)) # turn page image into numpy array
-            ocr_start = time.time()
-            best_rotation = 0
-            ocr_results_page = ocr.ocr(np_image)[0] # run ocr
-            if ocr_results_page is not None:
-                ocr_results_page_avg_conf = np.mean([val[1][1] for val in ocr_results_page])+0.05 # small bonus assuming most pages are not rotated
-                ocr_results_page_num_boxes = len(ocr_results_page)
-            else:
-                ocr_results_page_avg_conf = 0
-                ocr_results_page_num_boxes = 0
-            if ocr_results_page_avg_conf < 0.9:
-                # try different rotations if low confidence
-                for rotation in ROTATIONS_TO_TRY:
-                    img = np.array(Image.fromarray(np_image).rotate(rotation, expand=True)) # rotate
-                    _ocr_results_page =  ocr.ocr(img)[0] # run ocr
+    for i in range(doc.page_count):
+        if i <= MAX_PAGES:
+            try: # catch any error not expected
+                page = doc.load_page(i)
+                best_rotation = 0
+                try:
+                    pix = page.get_pixmap(matrix=mat)  # render page to an image
+                except:
+                    # in very rare cases single PDF pages can be broken
+                    logger.error(f'[CURRENT DOCUMENT: {relative_path}] [ERROR_MESSAGE: BROKEN_PAGE {page_no}]')
+                    ocr_results.append([''])
+                    page_rotations.append(0)
+                    continue
+                np_image = np.frombuffer(buffer=pix.samples, dtype=np.uint8).reshape((pix.height, pix.width, 3)) # turn page image into numpy array
+                ocr_start = time.time()
+                ocr_results_page = ocr.ocr(np_image)[0] # run ocr
+                if ocr_results_page is not None:
+                    ocr_results_page_avg_conf = np.mean([val[1][1] for val in ocr_results_page])+0.05 # small bonus assuming most pages are not rotated
+                    ocr_results_page_num_boxes = len(ocr_results_page)
+                else:
+                    ocr_results_page_avg_conf = 0
+                    ocr_results_page_num_boxes = 0
+                if ocr_results_page_avg_conf < 0.9:
+                    # try different rotations if low confidence
+                    for rotation in ROTATIONS_TO_TRY:
+                        img = np.array(Image.fromarray(np_image).rotate(rotation, expand=True)) # rotate
+                        _ocr_results_page =  ocr.ocr(img)[0] # run ocr
+                        if _ocr_results_page is None:
+                            continue
+                        else:
+                            _ocr_results_page_avg_conf = np.mean([val[1][1] for val in _ocr_results_page])
+                            _ocr_results_page_num_boxes = len(_ocr_results_page)
+                        if _ocr_results_page_avg_conf > ocr_results_page_avg_conf and (_ocr_results_page_num_boxes >= ocr_results_page_num_boxes):
+                            ocr_results_page_avg_conf = _ocr_results_page_avg_conf
+                            ocr_results_page_num_boxes = _ocr_results_page_num_boxes
+                            ocr_results_page = _ocr_results_page
+                            best_rotation = rotation
                     if _ocr_results_page is None:
-                        continue
-                    else:
-                        _ocr_results_page_avg_conf = np.mean([val[1][1] for val in _ocr_results_page])
-                        _ocr_results_page_num_boxes = len(_ocr_results_page)
-                    if _ocr_results_page_avg_conf > ocr_results_page_avg_conf and (_ocr_results_page_num_boxes >= ocr_results_page_num_boxes):
-                        ocr_results_page_avg_conf = _ocr_results_page_avg_conf
-                        ocr_results_page_num_boxes = _ocr_results_page_num_boxes
-                        ocr_results_page = _ocr_results_page
-                        best_rotation = rotation
-                if _ocr_results_page is None:
-                    # assuming all rotations yielded no results
-                    ocr_results_page = ''
-            page_rotations.append(best_rotation)
-            # simple output
-            if OUTPUT_FORMAT == 'SIMPLE':
-                ocr_results_page = simplify_output(ocr_results_page)
-            ocr_results.append(ocr_results_page)
-            logger.info(f'[CURRENT DOCUMENT: {relative_path}] [PAGE_NO: {page_no}] [PAGE_OCR_TIME: {round(time.time() - ocr_start, 3)}]')
+                        # assuming all rotations yielded no results
+                        ocr_results_page = ''
+                page_rotations.append(best_rotation)
+                # simple output
+                if OUTPUT_FORMAT == 'SIMPLE':
+                    ocr_results_page = simplify_output(ocr_results_page)
+                ocr_results.append(ocr_results_page)
+                logger.info(f'[CURRENT DOCUMENT: {relative_path}] [PAGE_NO: {page_no}] [PAGE_OCR_TIME: {round(time.time() - ocr_start, 3)}]')
+            except Exception as e:
+                error_trace = traceback.format_exc()
+                logger.error(f'[CURRENT DOCUMENT: {relative_path}] [BROKEN_PAGE: {{page_no}}] [ERROR_MESSAGE: UNEXPECTED_ERROR TRACE:{error_trace}]')
+                page_rotations.append(best_rotation)
+                ocr_results.append([''])
             page_no += 1
         else:
             break
